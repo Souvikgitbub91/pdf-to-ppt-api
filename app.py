@@ -3,8 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import os
 import tempfile
-import asyncio
-import threading
 
 app = FastAPI(title="PDF to PPT Converter API")
 
@@ -19,9 +17,9 @@ app.add_middleware(
 
 class PDFToPPTConverter:
     def __init__(self):
-        self.max_pages = int(os.getenv("MAX_PAGES", "5"))  # Reduced for stability
-        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "5242880"))  # 5MB
-        self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "90"))  # Reduced timeout
+        self.max_pages = int(os.getenv("MAX_PAGES", "5"))
+        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "5242880"))
+        self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "90"))
     
     def convert_pdf_to_ppt(self, pdf_path: str, ppt_path: str) -> dict:
         try:
@@ -30,7 +28,7 @@ class PDFToPPTConverter:
             from pptx import Presentation
             from pptx.util import Inches
             
-            # Convert PDF to images with low DPI for stability
+            # Convert PDF to images
             images = convert_from_path(pdf_path, dpi=100, first_page=1, last_page=self.max_pages)
             
             if not images:
