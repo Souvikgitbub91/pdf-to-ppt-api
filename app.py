@@ -9,7 +9,7 @@ from pptx.util import Inches
 
 app = FastAPI(title="PDF to PPT Converter API")
 
-# CORS middleware to allow WordPress to call this API
+# CORS middleware to allow cross-origin requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +30,7 @@ class PDFToPPTConverter:
             # Create a PowerPoint presentation
             prs = Presentation()
             
-            # Set slide layout (blank layout)
+            # Use blank slide layout
             blank_slide_layout = prs.slide_layouts[6]
             
             for i, image in enumerate(images):
@@ -43,9 +43,9 @@ class PDFToPPTConverter:
                     img_path = tmp_file.name
                 
                 # Add image to slide
-                left = Inches(1)
-                top = Inches(1)
-                slide.shapes.add_picture(img_path, left, top, height=Inches(6))
+                left = Inches(0.5)
+                top = Inches(0.5)
+                slide.shapes.add_picture(img_path, left, top, height=Inches(7))
                 
                 # Clean up temporary image file
                 os.unlink(img_path)
@@ -62,7 +62,7 @@ converter = PDFToPPTConverter()
 
 @app.post("/convert/")
 async def convert_pdf_to_ppt(file: UploadFile = File(...)):
-    if not file.filename.endswith('.pdf'):
+    if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
     # Create temporary files
@@ -78,19 +78,26 @@ async def convert_pdf_to_ppt(file: UploadFile = File(...)):
         result = converter.convert(pdf_path, ppt_path)
         
         if result["success"]:
-            return FileResponse(ppt_path, media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation', filename="converted.pptx")
+            return FileResponse(
+                ppt_path, 
+                media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation', 
+                filename="converted.pptx"
+            )
         else:
             raise HTTPException(status_code=500, detail=result["error"])
     
     finally:
-        # Clean up temporary files
+        # Clean up temporary PDF file
         if os.path.exists(pdf_path):
             os.unlink(pdf_path)
-        # PPT file will be deleted after sending
 
 @app.get("/")
 async def root():
     return {"message": "PDF to PPT Converter API is running"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn
