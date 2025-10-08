@@ -2,9 +2,15 @@ services:
   - type: web
     name: pdf-to-ppt-api
     env: python
-    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    plan: free
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.0
+      - key: MAX_PAGES
+        value: 10
+      - key: MAX_FILE_SIZE
+        value: 8388608
+      - key: TIMEOUT_SECONDS
+        value: 120
+      - key: CONVERSION_DPI
+        value: 150
