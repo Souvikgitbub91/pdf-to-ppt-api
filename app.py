@@ -103,12 +103,9 @@ converter = PDFToPPTConverter()
 
 @app.post("/convert/")
 async def convert_pdf_to_ppt(file: UploadFile = File(...)):
-    # Validate file
+    # Validate file - removed content type check to fix 422 error
     if not file.filename or not file.filename.lower().endswith('.pdf'):
         raise HTTPException(422, "File must be a PDF")
-    
-    if file.content_type not in ['application/pdf', 'application/octet-stream', None]:
-        raise HTTPException(422, "Invalid content type")
     
     # Read file content with size check
     content = await file.read()
@@ -150,7 +147,6 @@ async def convert_pdf_to_ppt(file: UploadFile = File(...)):
         # Cleanup
         if os.path.exists(pdf_path):
             os.unlink(pdf_path)
-        # Note: ppt_path is cleaned by FileResponse after sending
 
 @app.get("/")
 async def root():
