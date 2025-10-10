@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-pdf2image
-python-pptx
-pillow
 python-multipart
+requests
+pdf2image
+pillow
+python-pptx

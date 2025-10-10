@@ -1,11 +1,13 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 import os
 import tempfile
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import signal
+import requests
 
 app = FastAPI(title="PDF to PPT Converter API")
 
@@ -20,6 +22,10 @@ app.add_middleware(
 
 # Thread pool for CPU-intensive tasks
 executor = ThreadPoolExecutor(max_workers=1)
+
+# Pydantic model for JSON requests
+class URLRequest(BaseModel):
+    file_url: str
 
 class Timeout:
     """Timeout context manager for synchronous code"""
@@ -38,10 +44,10 @@ class Timeout:
 
 class PDFToPPTConverter:
     def __init__(self):
-        self.max_pages = int(os.getenv("MAX_PAGES", "3"))  # Reduced for free tier
-        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "2097152"))  # 2MB
+        self.max_pages = int(os.getenv("MAX_PAGES", "3"))
+        self.max_file_size = int(os.getenv("MAX_FILE_SIZE", "2097152"))
         self.timeout_seconds = int(os.getenv("TIMEOUT_SECONDS", "25"))
-        self.dpi = int(os.getenv("CONVERSION_DPI", "80"))  # Lower DPI for speed
+        self.dpi = int(os.getenv("CONVERSION_DPI", "80"))
     
     def convert_pdf_to_ppt(self, pdf_path: str, ppt_path: str) -> dict:
         try:
@@ -67,7 +73,7 @@ class PDFToPPTConverter:
                     dpi=self.dpi, 
                     first_page=1, 
                     last_page=self.max_pages,
-                    thread_count=1  # Reduce memory usage
+                    thread_count=1
                 )
             
             if not images:
@@ -102,27 +108,50 @@ class PDFToPPTConverter:
 converter = PDFToPPTConverter()
 
 @app.post("/convert/")
-async def convert_pdf_to_ppt(file: UploadFile = File(...)):
-    # Validate file - removed content type check to fix 422 error
-    if not file.filename or not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(422, "File must be a PDF")
-    
-    # Read file content with size check
-    content = await file.read()
-    if len(content) == 0:
-        raise HTTPException(422, "Empty file")
-    
-    if len(content) > converter.max_file_size:
-        raise HTTPException(413, f"File too large. Max {converter.max_file_size//1024//1024}MB")
-    
-    # Save PDF temporarily
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as pdf_file:
-        pdf_file.write(content)
-        pdf_path = pdf_file.name
-    
+async def convert_pdf_to_ppt(file: UploadFile = File(None), url_request: URLRequest = None):
+    """
+    Accepts both file upload and URL requests
+    """
+    pdf_path = None
     ppt_path = tempfile.mktemp(suffix='.pptx')
     
     try:
+        # Handle URL request
+        if url_request and url_request.file_url:
+            # Download PDF from URL
+            response = requests.get(url_request.file_url, timeout=10)
+            if response.status_code != 200:
+                raise HTTPException(422, "Failed to download PDF from URL")
+            
+            content = response.content
+            if len(content) == 0:
+                raise HTTPException(422, "Empty file from URL")
+            
+            if len(content) > converter.max_file_size:
+                raise HTTPException(413, f"File too large. Max {converter.max_file_size//1024//1024}MB")
+        
+        # Handle file upload
+        elif file:
+            # Validate file
+            if not file.filename or not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(422, "File must be a PDF")
+            
+            # Read file content
+            content = await file.read()
+            if len(content) == 0:
+                raise HTTPException(422, "Empty file")
+            
+            if len(content) > converter.max_file_size:
+                raise HTTPException(413, f"File too large. Max {converter.max_file_size//1024//1024}MB")
+        
+        else:
+            raise HTTPException(422, "Either provide a file upload or a file_url in JSON")
+        
+        # Save PDF temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as pdf_file:
+            pdf_file.write(content)
+            pdf_path = pdf_file.name
+        
         # Run conversion in thread pool with timeout
         loop = asyncio.get_event_loop()
         result = await asyncio.wait_for(
@@ -145,7 +174,7 @@ async def convert_pdf_to_ppt(file: UploadFile = File(...)):
         raise HTTPException(500, f"Internal server error: {str(e)}")
     finally:
         # Cleanup
-        if os.path.exists(pdf_path):
+        if pdf_path and os.path.exists(pdf_path):
             os.unlink(pdf_path)
 
 @app.get("/")
