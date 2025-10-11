@@ -1,5 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+import json
 
 app = FastAPI()
 
@@ -21,3 +23,11 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+# Safe exception handler that won't crash on encoding errors
+@app.exception_handler(Exception)
+async def universal_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
+    )
