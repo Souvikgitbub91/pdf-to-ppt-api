@@ -1,18 +1,13 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
 
 app = FastAPI()
 
-class ConvertRequest(BaseModel):
-    file_url: str
-
 @app.post("/convert")
-async def convert_pdf(request: ConvertRequest):
-    # Simple, guaranteed working endpoint
+async def convert_pdf():
     return {
         "status": "SUCCESS", 
-        "message": "PDF to PPT API is working perfectly!",
-        "received_url": request.file_url
+        "message": "API is working!",
+        "debug": "This endpoint accepts ANY request without validation"
     }
 
 @app.get("/")
