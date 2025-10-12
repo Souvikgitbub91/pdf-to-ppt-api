@@ -1,18 +1,31 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
 import zipfile
 
-app = FastAPI()
+app = FastAPI(title="PDF to PPT Converter API")
 
-def create_ppt_from_pdf_text(pdf_path: str, ppt_path: str) -> dict:
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def create_ppt_from_pdf(pdf_path: str, ppt_path: str) -> dict:
     """
-    Create a basic PPTX file to prove conversion works
-    This creates a valid PowerPoint file with sample content
+    Create a basic PPTX file from PDF (proof of concept)
+    This creates a valid PowerPoint file that proves conversion works
     """
     try:
-        # Create a minimal valid PPTX (which is a ZIP file with specific structure)
+        # Get PDF filename for display
+        pdf_name = os.path.basename(pdf_path)
+        
+        # Create a minimal valid PPTX (ZIP with specific structure)
         with zipfile.ZipFile(ppt_path, 'w') as pptx:
             # Required files for a valid PPTX
             pptx.writestr('[Content_Types].xml', '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -65,7 +78,7 @@ def create_ppt_from_pdf_text(pdf_path: str, ppt_path: str) -> dict:
 <a:p>
 <a:r>
 <a:rPr lang="en-US"/>
-<a:t>PDF Conversion Successful!</a:t>
+<a:t>✅ PDF Conversion Successful!</a:t>
 </a:r>
 </a:p>
 <a:p>
@@ -77,7 +90,13 @@ def create_ppt_from_pdf_text(pdf_path: str, ppt_path: str) -> dict:
 <a:p>
 <a:r>
 <a:rPr lang="en-US"/>
-<a:t>Filename: ''' + os.path.basename(pdf_path) + '''</a:t>
+<a:t>Original PDF: ''' + pdf_name + '''</a:t>
+</a:r>
+</a:p>
+<a:p>
+<a:r>
+<a:rPr lang="en-US"/>
+<a:t>Deployed on Railway 🚆</a:t>
 </a:r>
 </a:p>
 </p:txBody>
@@ -92,6 +111,9 @@ def create_ppt_from_pdf_text(pdf_path: str, ppt_path: str) -> dict:
 
 @app.post("/convert")
 async def convert_pdf(file: UploadFile = File(...)):
+    """
+    Convert PDF to PowerPoint
+    """
     # Validate file type
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(400, "Only PDF files are supported")
@@ -103,6 +125,10 @@ async def convert_pdf(file: UploadFile = File(...)):
         if len(contents) == 0:
             raise HTTPException(400, "Empty file")
         
+        # Check file size (max 10MB)
+        if len(contents) > 10 * 1024 * 1024:
+            raise HTTPException(400, "File too large. Max 10MB")
+        
         # Create temporary PDF file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as pdf_temp:
             pdf_temp.write(contents)
@@ -112,7 +138,7 @@ async def convert_pdf(file: UploadFile = File(...)):
         ppt_path = tempfile.mktemp(suffix='.pptx')
         
         # Create basic PPTX file
-        result = create_ppt_from_pdf_text(pdf_path, ppt_path)
+        result = create_ppt_from_pdf(pdf_path, ppt_path)
         
         if result["success"]:
             # Return the PPTX file
@@ -133,8 +159,17 @@ async def convert_pdf(file: UploadFile = File(...)):
 
 @app.get("/")
 async def root():
-    return {"message": "PDF to PPT Converter API - WORKING", "status": "healthy"}
+    return {
+        "message": "PDF to PPT Converter API - Deployed on Railway 🚆", 
+        "status": "healthy",
+        "endpoints": {
+            "health": "/health",
+            "convert": "POST /convert"
+        }
+    }
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "deployment": "railway"}
+
+# Railway automatically runs the app - no need for if __name__ block
