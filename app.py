@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import tempfile
 import zipfile
+import uvicorn
 
 app = FastAPI()
 
@@ -86,3 +87,8 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+# CRITICAL FIX: This is the code that makes it work on Railway
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app:app", host="0.0.0.0", port=port)
