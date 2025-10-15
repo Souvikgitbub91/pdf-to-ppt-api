@@ -1,6 +1,6 @@
-fastapi==0.99.3
-uvicorn==0.22.0
-python-multipart==0.0.6
-pymupdf==1.22.0
-python-pptx==0.6.21
-aiofiles==23.1.0
+fastapi
+uvicorn
+python-multipart
+pdf2image
+pillow
+python-pptx
