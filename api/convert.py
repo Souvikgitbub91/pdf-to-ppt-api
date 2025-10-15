@@ -1,10 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
-from io import BytesIO
+from fastapi import FastAPI, File, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Inches
-from PyPDF2 import PdfReader
-from fpdf import FPDF
+import tempfile
+import os
 
 app = FastAPI()
 
@@ -14,29 +14,35 @@ def home():
 
 @app.post("/api/convert")
 async def convert_pdf_to_ppt(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Please upload a PDF file.")
-
-    pdf_bytes = await file.read()
-    if not pdf_bytes:
-        raise HTTPException(status_code=400, detail="Empty file uploaded.")
-
     try:
-        reader = PdfReader(BytesIO(pdf_bytes))
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            tmp_pdf.write(await file.read())
+            tmp_pdf_path = tmp_pdf.name
+
+        # Create PPT
         prs = Presentation()
+        pdf_doc = fitz.open(tmp_pdf_path)
 
-        for i, page in enumerate(reader.pages):
+        for page in pdf_doc:
+            image = page.get_pixmap()
+            image_path = f"{tmp_pdf_path}_{page.number}.png"
+            image.save(image_path)
+
             slide = prs.slides.add_slide(prs.slide_layouts[6])
-            text = page.extract_text() or " "
-            textbox = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(5))
-            textbox.text = text.strip()
+            slide.shapes.add_picture(image_path, Inches(0), Inches(0), Inches(10), Inches(7.5))
+            os.remove(image_path)
 
-        output = BytesIO()
-        prs.save(output)
-        output.seek(0)
-        filename = file.filename.replace(".pdf", ".pptx")
-        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-        return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation", headers=headers)
+        pdf_doc.close()
+
+        # Save PPT file
+        pptx_path = tmp_pdf_path.replace(".pdf", ".pptx")
+        prs.save(pptx_path)
+
+        return FileResponse(pptx_path, filename="converted.pptx", media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    finally:
+        if os.path.exists(tmp_pdf_path):
+            os.remove(tmp_pdf_path)
