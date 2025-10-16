@@ -1,0 +1,12 @@
+{
+  "name": "pdf-to-ppt-api",
+  "version": "1.0.0",
+  "description": "PDF to PPT Conversion API",
+  "scripts": {
+    "dev": "node server.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
+}
