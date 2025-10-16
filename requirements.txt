@@ -3,5 +3,5 @@ python-pptx==0.6.21
 pdf2image==1.16.3
 pillow==10.0.1
 requests==2.31.0
-py-pdf==3.9.0
+pypdf==3.9.0
 werkzeug==2.3.7
