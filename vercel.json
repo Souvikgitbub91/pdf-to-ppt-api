@@ -8,13 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "api/$1"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/health"
+    },
+    {
+      "src": "/convert",
+      "dest": "/api/convert"
     }
-  ],
-  "functions": {
-    "api/convert.py": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
